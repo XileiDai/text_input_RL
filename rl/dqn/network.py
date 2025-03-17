@@ -3,6 +3,8 @@ from typing import Any, Dict, List, Optional, Type, Union, Tuple
 import torch as th
 from gymnasium import spaces
 from torch import nn
+from transformers import GPT2Tokenizer, GPT2Model
+import torch
 
 # from stable_baselines3.common.policies import BasePolicy, ContinuousCritic
 from stable_baselines3.common.policies import BasePolicy, BaseModel
@@ -18,106 +20,6 @@ from stable_baselines3.common.torch_layers import (
 from stable_baselines3.common.type_aliases import PyTorchObs, Schedule
 from rl.dqn.dqn_para import Args
 
-
-# class Actor(nn.Module):
-#     """
-#     Actor network (policy) for TD3.
-
-#     :param observation_space: Obervation space
-#     :param action_space: Action space
-#     :param net_arch: Network architecture
-#     :param features_extractor: Network to extract features
-#         (a CNN when using images, a nn.Flatten() layer otherwise)
-#     :param features_dim: Number of features
-#     :param activation_fn: Activation function
-#     :param normalize_images: Whether to normalize images or not,
-#          dividing by 255.0 (True by default)
-#     """
-
-#     def __init__(
-#         self,
-#         observation_space: spaces.Space,
-#         action_space: spaces.Box,
-#         net_arch: List[int],
-#         # features_dim: int,
-#         activation_fn: Type[nn.Module],
-#         features_extractor: List[int] =None,
-#         args: Args = None,
-#     ):
-#         super(Actor, self).__init__()
-#         # super().__init__(
-#         #     observation_space,
-#         #     action_space,
-#         #     features_extractor=features_extractor,
-#         #     normalize_images=normalize_images,
-#         #     squash_output=True,
-#         # )
-#         self.args = args
-#         self.net_arch = net_arch
-#         if features_extractor == None:
-#             self.features_dim = last_layer_dim = observation_space.shape[0]
-#             self.fe_net = None
-#         else:
-#             self.features_dim = features_extractor[-1]
-#             last_layer_dim = observation_space.shape[0]
-#             fe = []
-#             for current_layer_dim in features_extractor:
-#                 fe.append(nn.Linear(last_layer_dim, current_layer_dim))
-#                 # if need add activation layers
-#                 last_layer_dim = current_layer_dim
-#             self.fe_net = nn.Sequential(*fe)
-#         self.activation_fn = activation_fn
-#         self.features_extractor = features_extractor
-#         # action_dim = action_space.n
-#         # actor_net = []
-#         # last_layer_dim_pi = self.features_dim
-#         # for curr_layer_dim in net_arch:
-#         #     actor_net.append(nn.Linear(last_layer_dim_pi, curr_layer_dim))
-#         #     actor_net.append(activation_fn())
-#         #     last_layer_dim_pi = curr_layer_dim     
-#         # actor_net.append(nn.Linear(last_layer_dim_pi, 1))
-#         # actor_net.append(nn.Tanh())
-#         actor_net = create_mlp(self.features_dim, 1, net_arch, activation_fn, squash_output=True)
-#         # Deterministic action
-#         self.mu = nn.Sequential(*actor_net)
-#         a = 1
-
-#     def _get_constructor_parameters(self) -> Dict[str, Any]:
-#         data = super()._get_constructor_parameters()
-
-#         data.update(
-#             dict(
-#                 net_arch=self.net_arch,
-#                 features_dim=self.features_dim,
-#                 activation_fn=self.activation_fn,
-#                 features_extractor=self.features_extractor,
-#             )
-#         )
-#         return data
-
-#     def forward(self, obs: th.Tensor, deterministic: bool = False) -> th.Tensor:
-#         # assert deterministic, 'The TD3 actor only outputs deterministic actions'
-#         # features = self.extract_features(obs, self.features_extractor)
-#         if self.fe_net is not None:
-#             feature = self.fe_net(obs.to(th.float32))
-#         else:
-#             feature = obs.to(th.float32)
-#         action = self.mu(feature)
-#         dis = th.distributions.Normal(action, self.args.noise_std)
-#         if deterministic:
-#             return action
-#         else:
-#             action += dis.sample()
-#             action = action.clamp(-1,1)
-#             return action
-
-#     # def _predict(self, observation: PyTorchObs, deterministic: bool = False) -> th.Tensor:
-#     #     # Note: the deterministic deterministic parameter is ignored in the case of TD3.
-#     #     #   Predictions are always deterministic.
-#     #     return self(observation)
-
-#     def set_training_mode(self, mode):
-#         self.train(mode)
 
 class q_net(nn.Module):
     """
@@ -175,7 +77,8 @@ class q_net(nn.Module):
                 fe.append(nn.Linear(last_layer_dim, current_layer_dim))
                 # if need add activation layers
                 last_layer_dim = current_layer_dim
-            self.fe_net = nn.Sequential(*fe)            
+            self.fe_net = nn.Sequential(*fe)      
+   
         elif isinstance(features_extractor, nn.Module):
             features_dim = features_extractor[-1].out_features
             self.fe_net = features_extractor
@@ -183,27 +86,60 @@ class q_net(nn.Module):
             features_dim = observation_space.shape[0]
             self.fe_net = None
 
+        
+
+        # Update the feature extractor to LLM model
+        self.tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+        self.llm_model = GPT2Model.from_pretrained('gpt2')  
+        self.llm_model.to('cuda')
+
+        for param in self.llm_model.parameters():
+            param.requires_grad = True            
+
         action_dim = action_space.n
         self.share_features_extractor = share_features_extractor
         # self.n_critics = n_critics
         # self.q_networks: List[nn.Module] = []
         # for idx in range(n_critics):
-        q_net_list = create_mlp(features_dim , action_dim, net_arch, activation_fn)
+        
+        q_net_list = create_mlp(self.llm_model.config.n_embd, action_dim, net_arch, activation_fn) # update net_arch for the ANN, can be null list: []
         self.q_network = nn.Sequential(*q_net_list)
         self.q_network.float()
         # self.add_module(f"qf{idx}", q_net)
         # self.q_networks.append(q_net)
+
+    def generate_token(self, obs):
+        prompt = 'The tempearture is xx'
+        input_ids = []
+        attention_mask = []
+        if len(obs.shape)>1:
+            for i in range(obs.shape[0]):
+                inputs_token = self.tokenizer(prompt, return_tensors="pt")
+                inputs_token = {key: value.to("cuda") for key, value in inputs_token.items()}
+                input_ids.append(inputs_token['input_ids'])
+                attention_mask.append(inputs_token['attention_mask'])
+            input_ids = torch.stack(input_ids).squeeze()
+            attention_mask = torch.stack(attention_mask).squeeze()
+            tokens = {'input_ids': input_ids, 'attention_mask': attention_mask}
+        else:
+            tokens = self.tokenizer(prompt, return_tensors="pt")
+            tokens = {key: value.to("cuda") for key, value in tokens.items()}
+        return tokens
 
     def forward(self, obs: th.Tensor) -> Tuple[th.Tensor, ...]:
         # Learn the features extractor using the policy loss only
         # when the features_extractor is shared with the actor
 
         # dxl: remove feature extractor
-        if self.fe_net is not None:
-            with th.set_grad_enabled(not self.share_features_extractor):
-                feature = self.fe_net(obs.to(th.float32))
-        else:
-            feature = obs.to(th.float32)
+        inputs_token = self.generate_token(obs)
+        llm_feature = self.llm_model(**inputs_token)
+        last_hidden_states = llm_feature[0]  # The last hidden-state is the first element of the output tuple
+        feature = last_hidden_states[:,-1,:]
+        # if self.fe_net is not None:
+        #     with th.set_grad_enabled(not self.share_features_extractor):
+        #         feature = self.fe_net(obs.to(th.float32))
+        # else:
+        #     feature = obs.to(th.float32)
 
         qvalue_input = feature.to(th.float32)
         return self.q_network(qvalue_input)
@@ -316,36 +252,7 @@ class Agent(nn.Module):
         a = 1
 
     def _build(self, lr_schedule: Schedule) -> None:
-        # Create actor and target
-        # the features extractor should not be shared
-        # self.actor = Actor(**self.actor_kwargs)
-        # self.init_weight(self.actor)
-        # self.actor_target = Actor(**self.actor_kwargs)
-        # Initialize the target to have the same weights as the actor
-        # self.actor_target.load_state_dict(self.actor.state_dict())
 
-        # self.actor.optimizer = self.args.optimizer_class(
-        #     self.actor.parameters(),
-        #     lr=lr_schedule(1),  # type: ignore[call-arg]
-        #     **self.optimizer_kwargs,
-        # )
-
-        # if self.share_features_extractor:
-        #     self.critic_kwargs.update(
-        #         {'features_extractor': self.actor.fe_net}
-        #     )
-        #     self.critic = ContinuousCritic(**self.critic_kwargs)
-        #     # Critic target should not share the features extractor with critic
-        #     # but it can share it with the actor target as actor and critic are sharing
-        #     # the same features_extractor too
-        #     # NOTE: as a result the effective poliak (soft-copy) coefficient for the features extractor
-        #     # will be 2 * tau instead of tau (updated one time with the actor, a second time with the critic)
-        #     self.critic_kwargs.update(
-        #         {'features_extractor': self.actor_target.fe_net}
-        #     )            
-        #     self.critic_target = ContinuousCritic(**self.critic_kwargs)
-        # else:
-            # Create new features extractor for each network
         self.q_network = q_net(**self.q_net_kwargs)
         self.q_network_target = q_net(**self.q_net_kwargs)
         self.init_weight(self.q_network)

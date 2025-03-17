@@ -295,7 +295,9 @@ class buildinggym_env():
                     for _, value in self.ext_obs_var.items():
                         state.append(value)
                 cooling_energy =  obs['Energy_1'].item() + obs['Energy_2'].item() + obs['Energy_3'].item() + obs['Energy_4'].item() + obs['Energy_5'].item()
-                state = self.normalize_input_i(state)
+
+
+                # state = self.normalize_input_i(state)
                 if self.ext_obs_bool:
                     signal = state[-1]
                 else:
