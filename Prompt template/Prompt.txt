@@ -1,0 +1,24 @@
+# Current Conditions:
+
+Outdoor temperature: {t_out} °C;
+Indoor temperature: {t_in} °C;
+People density per floor area: {people_var} W/m²;
+Lighting power per floor area: {light_var} W/m²;
+Electrical equipment power per floor area: {equipment_var} W/m²;
+The fraction radiant of the electrical equipment: 0.5;
+Total Gross Floor Area: 511.16 m²;
+Conditioned Areas: 511.16 m²;
+Window Information: Gross window-wall ratio is 15.89%.
+
+
+# Objective:
+I would like to maintain the total cooling load of the building at approximately 17,000 W throughout the day.
+
+# Available Actions:
+
+Increase the cooling setpoint by 0.5°C.
+Decrease the cooling setpoint by 0.5°C.
+Keep the current setpoints as they are.
+
+# Request:
+Please advise on how I should adjust the cooling setpoints to meet the desired cooling load of 17,000 W.

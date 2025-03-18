@@ -14,7 +14,7 @@ class Args:
     # """if toggled, cuda will be enabled by default"""
     # track: bool = True
     # """if toggled, this experiment will be tracked with Weights and Biases"""
-    wandb_project_name: str = "energygym-dqn-paper-finetune"
+    wandb_project_name: str = "LLM-text-inputs"
     """the wandb's project name"""
     wandb_entity: str = 'buildinggym'
     """the entity (team) of wandb's project"""

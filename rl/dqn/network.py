@@ -69,22 +69,24 @@ class q_net(nn.Module):
         #     features_extractor=features_extractor,
         #     normalize_images=normalize_images,
         # )
-        if isinstance(features_extractor, List):
-            features_dim = features_extractor[-1]
-            last_layer_dim = observation_space.shape[0]
-            fe = []
-            for current_layer_dim in features_extractor:
-                fe.append(nn.Linear(last_layer_dim, current_layer_dim))
-                # if need add activation layers
-                last_layer_dim = current_layer_dim
-            self.fe_net = nn.Sequential(*fe)      
+
+        # ## remove features_extractor, replaced by LLM
+        # if isinstance(features_extractor, List):
+        #     features_dim = features_extractor[-1]
+        #     last_layer_dim = observation_space.shape[0]
+        #     fe = []
+        #     for current_layer_dim in features_extractor:
+        #         fe.append(nn.Linear(last_layer_dim, current_layer_dim))
+        #         # if need add activation layers
+        #         last_layer_dim = current_layer_dim
+        #     self.fe_net = nn.Sequential(*fe)      
    
-        elif isinstance(features_extractor, nn.Module):
-            features_dim = features_extractor[-1].out_features
-            self.fe_net = features_extractor
-        else:
-            features_dim = observation_space.shape[0]
-            self.fe_net = None
+        # elif isinstance(features_extractor, nn.Module):
+        #     features_dim = features_extractor[-1].out_features
+        #     self.fe_net = features_extractor
+        # else:
+        #     features_dim = observation_space.shape[0]
+        #     self.fe_net = None
 
         
 
@@ -94,7 +96,8 @@ class q_net(nn.Module):
         self.llm_model.to('cuda')
 
         for param in self.llm_model.parameters():
-            param.requires_grad = True            
+            # determine whether to finetune LLM
+            param.requires_grad = False            
 
         action_dim = action_space.n
         self.share_features_extractor = share_features_extractor
@@ -107,13 +110,35 @@ class q_net(nn.Module):
         self.q_network.float()
         # self.add_module(f"qf{idx}", q_net)
         # self.q_networks.append(q_net)
+    
+    def generate_prompt(self, obs):
+        with open('Prompt template\Prompt.txt', 'r') as file:
+            # Read the entire content of the file
+            prompt_templatte = file.read()
+        # self.inter_obs_var = ['t_out', 't_in', 'occ', 'light', 'Equip']
+
+        # Outdoor temperature: {t_out} °C;
+        # Indoor temperature: {t_in} °C;
+        # People density per floor area: {people_var} W/m²;
+        # Lighting power per floor area: {light_var} W/m²;
+        # Electrical equipment power per floor area: {equipment_var} W/m²;        
+        occ = 4.30556417E-02 * self.state_list[2]
+        light = 15.59* self.state_list[3]
+        Equip = 8.07293281E+00* self.state_list[4]
+        prompt_templatte = prompt_templatte.replace('{t_out}', str(round(self.state_list[0],2)))
+        prompt_templatte = prompt_templatte.replace('{t_in}', str(round(self.state_list[1],2)))
+        prompt_templatte = prompt_templatte.replace('{people_var}', str(round(occ,2)))
+        prompt_templatte = prompt_templatte.replace('{light_var}', str(round(light,2)))
+        prompt_templatte = prompt_templatte.replace('{equipment_var}', str(round(Equip,2)))
+        return prompt_templatte
+
 
     def generate_token(self, obs):
-        prompt = 'The tempearture is xx'
         input_ids = []
         attention_mask = []
         if len(obs.shape)>1:
             for i in range(obs.shape[0]):
+                prompt = self.generate_prompt(obs[i])
                 inputs_token = self.tokenizer(prompt, return_tensors="pt")
                 inputs_token = {key: value.to("cuda") for key, value in inputs_token.items()}
                 input_ids.append(inputs_token['input_ids'])
@@ -122,15 +147,17 @@ class q_net(nn.Module):
             attention_mask = torch.stack(attention_mask).squeeze()
             tokens = {'input_ids': input_ids, 'attention_mask': attention_mask}
         else:
+            prompt = self.generate_prompt(obs)
             tokens = self.tokenizer(prompt, return_tensors="pt")
             tokens = {key: value.to("cuda") for key, value in tokens.items()}
         return tokens
 
-    def forward(self, obs: th.Tensor) -> Tuple[th.Tensor, ...]:
+    def forward(self, obs: th.Tensor, state_list = None) -> Tuple[th.Tensor, ...]:
         # Learn the features extractor using the policy loss only
         # when the features_extractor is shared with the actor
 
         # dxl: remove feature extractor
+        self.state_list = state_list
         inputs_token = self.generate_token(obs)
         llm_feature = self.llm_model(**inputs_token)
         last_hidden_states = llm_feature[0]  # The last hidden-state is the first element of the output tuple
@@ -287,8 +314,9 @@ class Agent(nn.Module):
         )
         return data
 
-    def forward(self, observation: PyTorchObs, deterministic: bool = False) -> th.Tensor:
-        return th.argmax(self.q_network(observation))
+    def forward(self, observation: PyTorchObs, deterministic: bool = False, state_list = None) -> th.Tensor:
+        self.state_list = state_list
+        return th.argmax(self.q_network(observation, state_list = state_list))
 
     def _predict(self, observation: PyTorchObs, deterministic: bool = False) -> th.Tensor:
         # Note: the deterministic deterministic parameter is ignored in the case of TD3.

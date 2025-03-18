@@ -294,6 +294,7 @@ class buildinggym_env():
                         self.t_index = t.hour
                     for _, value in self.ext_obs_var.items():
                         state.append(value)
+                state_list = state.copy()
                 cooling_energy =  obs['Energy_1'].item() + obs['Energy_2'].item() + obs['Energy_3'].item() + obs['Energy_4'].item() + obs['Energy_5'].item()
 
 
@@ -304,7 +305,7 @@ class buildinggym_env():
                     signal = 0.5
                 state = torch.Tensor(state).cuda() if torch.cuda.is_available() and self.args.device == 'cuda'  else torch.Tensor(state).cpu()
                 with torch.no_grad():
-                    actions = self.agent(state)
+                    actions = self.agent(state, state_list = state_list)
                     # actions = torch.argmax(q_values, dim=0).cpu().item()
                 if random.random() < self.epsilon:
                 # if random.random() < 1.1:
@@ -335,6 +336,9 @@ class buildinggym_env():
                 # obs.insert(obs.columns.get_loc("t_in") + 1, 'logprobs', logprob.cpu().item())
                 # obs.insert(obs.columns.get_loc("t_in") + 1, 'values', value.cpu().item())
 
+                # for name, module in self.agent.q_network.llm_model.named_children():
+                #     requires_grad = any(param.requires_grad for param in module.parameters())
+                #     print(f"Module: {name}, Requires Grad: {requires_grad}")
 
                 if self.sensor_index == 0:
                     self.sensor_dic = pd.DataFrame({})

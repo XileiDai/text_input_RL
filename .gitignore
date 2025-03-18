@@ -25,3 +25,4 @@ Archive results/*
 To do/*
 tmp/*
 LLM-RL/*
+!Prompt template/*
