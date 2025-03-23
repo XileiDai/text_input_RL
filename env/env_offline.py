@@ -391,11 +391,14 @@ class buildinggym_env():
                             #     self.buffer.reset()  # dxl: can update to be able to store somme history info
                             #     self.p_loss_list.append(p_loss_i)
                             #     self.v_loss_list.append(v_loss_i)
-
+                        # for name, param in self.agent.q_network.q_network.named_parameters():
+                        #     print(f"Parameter: {name}, Shape: {param}")
 
                     if i % self.args.train_frequency == 0 and self.buffer.buffer_size>self.args.batch_size and self.train:
                         if type(self.algo).__name__ == 'DQN':
+                            # a = time.time()
                             self.actor_losses_i, _ = self.algo.train()
+                            # print(time.time()-a)
                         else:
                             self.actor_losses_i, self.critic_losses_i = self.algo.train()
                         if not math.isnan(self.actor_losses_i):

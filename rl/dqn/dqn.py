@@ -219,9 +219,9 @@ class DQN(OffPolicyAlgorithm):
             dones = 0
 
             with th.no_grad():
-                target_max, _ = self.policy.q_network_target(nxt_obs).max(dim=1)
+                target_max, _ = self.policy.q_network_target(nxt_obs, state_list= nxt_obs.cpu().numpy()).max(dim=1)
                 td_target = rewards.flatten() + self.args.gamma * target_max
-            old_val = self.policy.q_network(obs).gather(1, actions.to(dtype = th.long)).squeeze()
+            old_val = self.policy.q_network(obs, state_list= obs.cpu().numpy()).gather(1, actions.to(dtype = th.long)).squeeze()
             old_val = old_val.to(dtype = th.float64)
             loss = F.mse_loss(td_target, old_val)
             self.policy.q_network.optimizer.zero_grad()

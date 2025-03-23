@@ -111,7 +111,7 @@ class q_net(nn.Module):
         # self.add_module(f"qf{idx}", q_net)
         # self.q_networks.append(q_net)
     
-    def generate_prompt(self, obs):
+    def generate_prompt(self, obs, state_list = None):
         with open('Prompt template\Prompt.txt', 'r') as file:
             # Read the entire content of the file
             prompt_templatte = file.read()
@@ -121,24 +121,24 @@ class q_net(nn.Module):
         # Indoor temperature: {t_in} °C;
         # People density per floor area: {people_var} W/m²;
         # Lighting power per floor area: {light_var} W/m²;
-        # Electrical equipment power per floor area: {equipment_var} W/m²;        
-        occ = 4.30556417E-02 * self.state_list[2]
-        light = 15.59* self.state_list[3]
-        Equip = 8.07293281E+00* self.state_list[4]
-        prompt_templatte = prompt_templatte.replace('{t_out}', str(round(self.state_list[0],2)))
-        prompt_templatte = prompt_templatte.replace('{t_in}', str(round(self.state_list[1],2)))
+        # Electrical equipment power per floor area: {equipment_var} W/m²; 
+        occ = 4.30556417E-02 * state_list[2]
+        light = 15.59* state_list[3]
+        Equip = 8.07293281E+00* state_list[4]
+        prompt_templatte = prompt_templatte.replace('{t_out}', str(round(state_list[0],2)))
+        prompt_templatte = prompt_templatte.replace('{t_in}', str(round(state_list[1],2)))
         prompt_templatte = prompt_templatte.replace('{people_var}', str(round(occ,2)))
         prompt_templatte = prompt_templatte.replace('{light_var}', str(round(light,2)))
         prompt_templatte = prompt_templatte.replace('{equipment_var}', str(round(Equip,2)))
         return prompt_templatte
 
 
-    def generate_token(self, obs):
+    def generate_token(self, obs, state_list):
         input_ids = []
         attention_mask = []
         if len(obs.shape)>1:
             for i in range(obs.shape[0]):
-                prompt = self.generate_prompt(obs[i])
+                prompt = self.generate_prompt(obs[i], state_list = state_list[i,:])
                 inputs_token = self.tokenizer(prompt, return_tensors="pt")
                 inputs_token = {key: value.to("cuda") for key, value in inputs_token.items()}
                 input_ids.append(inputs_token['input_ids'])
@@ -147,7 +147,7 @@ class q_net(nn.Module):
             attention_mask = torch.stack(attention_mask).squeeze()
             tokens = {'input_ids': input_ids, 'attention_mask': attention_mask}
         else:
-            prompt = self.generate_prompt(obs)
+            prompt = self.generate_prompt(obs, state_list=state_list)
             tokens = self.tokenizer(prompt, return_tensors="pt")
             tokens = {key: value.to("cuda") for key, value in tokens.items()}
         return tokens
@@ -157,8 +157,8 @@ class q_net(nn.Module):
         # when the features_extractor is shared with the actor
 
         # dxl: remove feature extractor
-        self.state_list = state_list
-        inputs_token = self.generate_token(obs)
+        # self.state_list = state_list
+        inputs_token = self.generate_token(obs, state_list=state_list)
         llm_feature = self.llm_model(**inputs_token)
         last_hidden_states = llm_feature[0]  # The last hidden-state is the first element of the output tuple
         feature = last_hidden_states[:,-1,:]
@@ -250,6 +250,7 @@ class Agent(nn.Module):
         self.optimizer_kwargs = optimizer_kwargs
         if net_arch is None:
             net_arch = [32, 8]
+            net_arch = []
 
         _, critic_arch = get_actor_critic_arch(net_arch)
 
@@ -315,7 +316,7 @@ class Agent(nn.Module):
         return data
 
     def forward(self, observation: PyTorchObs, deterministic: bool = False, state_list = None) -> th.Tensor:
-        self.state_list = state_list
+        # self.state_list = state_list
         return th.argmax(self.q_network(observation, state_list = state_list))
 
     def _predict(self, observation: PyTorchObs, deterministic: bool = False) -> th.Tensor:
@@ -338,10 +339,10 @@ class Agent(nn.Module):
         self.training = mode
 
     def init_weight(self, network):
-        for m in network.modules():
+        for m in network.q_network.modules():
             if isinstance(m, nn.Linear):
-                nn.init.normal(m.weight, mean=0, std = 0.9)
-                # nn.init.xavier_normal_(m.weight, gain=1)
+                # nn.init.normal(m.weight, mean=0, std = 0.01)
+                nn.init.xavier_uniform_(m.weight)
                 # nn.init.orthogonal_(m.weight, gain=1)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)            
