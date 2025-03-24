@@ -89,7 +89,7 @@ class Args:
     alpha: float = 0.99
     outlook_steps: int = 6
     step_size: int = 1
-    batch_size: int = 10
+    batch_size: int = 2
     # n_steps: int = 2
     # n_epochs: int = 10
     # clip_range: int = 50
@@ -105,7 +105,7 @@ class Args:
     # target_noise_clip: float = 5
     policy_delay: int = 2
     gamma: float = 0.9
-    max_buffer_size: int = 500
+    max_buffer_size: int = 10
     # gae_lambda: float = 1
     # ent_coef: float = 0
     # vf_coef: float = 0.5

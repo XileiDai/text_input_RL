@@ -112,7 +112,7 @@ class q_net(nn.Module):
         # self.q_networks.append(q_net)
     
     def generate_prompt(self, obs, state_list = None):
-        with open('Prompt template\Prompt.txt', 'r') as file:
+        with open('Prompt template/Prompt.txt', 'r') as file:
             # Read the entire content of the file
             prompt_templatte = file.read()
         # self.inter_obs_var = ['t_out', 't_in', 'occ', 'light', 'Equip']
