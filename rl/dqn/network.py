@@ -91,8 +91,8 @@ class q_net(nn.Module):
         
 
         # Update the feature extractor to LLM model
-        self.tokenizer = GPT2Tokenizer.from_pretrained('Pretrained_model')
-        self.llm_model = GPT2Model.from_pretrained('Pretrained_model')  
+        self.tokenizer = GPT2Tokenizer.from_pretrained('local_models/gpt2')
+        self.llm_model = GPT2Model.from_pretrained('local_models/gpt2')  
         self.llm_model.to('cuda')
 
         for param in self.llm_model.parameters():
