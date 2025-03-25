@@ -170,7 +170,7 @@ class buildinggym_env():
             #world='tmp_timestep 10 min.idf',
             weather='USA_FL_Miami.722020_TMY2.epw',
         
-            report='tmp/ooep-report-9e1287d2-8e75-4cf5-bbc5-f76580b56a69',
+            report='tmp/ooep-report-9e1287d2-8e75-4cf5-bbc5-f76580b56a69d',
             repeat=False,
             # design_day=False,
         ).add('logging:progress')
