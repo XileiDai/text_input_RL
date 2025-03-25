@@ -4,7 +4,7 @@ import torch as th
 
 @dataclass
 class Args:
-    exp_name: str = 'buildinggym-dqn'
+    exp_name: str = 'add_llm_feature'
     """the name of this experiment"""
     seed: int = None
     """seed of the experiment"""
@@ -118,3 +118,4 @@ class Args:
     # max_train_perEp: int = 1
     # xa_init_gain: float = 1.
     optimizer_class: Type[th.optim.Optimizer] = th.optim.SGD
+    d_ff: int = 32

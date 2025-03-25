@@ -1,12 +1,10 @@
 *.pyc
-Data/*
 tmp/*
 ref/*
 test
 *pyc
 *.idf
 *.xlsx
-*.csv
 *.xls
 *.pdf
 *.xls
@@ -17,8 +15,7 @@ RL control ref/*
 runs/*
 wandb/*
 Figures/*
-Data/*
-!Large office - 1AV940.idf
+!Small office-1A-Long.idf
 !Large office - 1AV232.idf
 !USA_FL_Miami.722020_TMY2.epw
 Archive results/*
