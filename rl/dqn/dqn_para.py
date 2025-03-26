@@ -4,7 +4,7 @@ import torch as th
 
 @dataclass
 class Args:
-    exp_name: str = 'buildinggym-dqn'
+    exp_name: str = 'add_llm_feature'
     """the name of this experiment"""
     seed: int = None
     """seed of the experiment"""
@@ -85,11 +85,11 @@ class Args:
     """the batch size (computed in runtime)"""        
 
     device: str = 'cuda'
-    learning_rate: float = 0.000003
-    alpha: float = 0.99
+    learning_rate: float = 5e-6
+    alpha: float = 0.999
     outlook_steps: int = 6
     step_size: int = 1
-    batch_size: int = 16
+    batch_size: int = 24
     # n_steps: int = 2
     # n_epochs: int = 10
     # clip_range: int = 50
@@ -105,7 +105,7 @@ class Args:
     # target_noise_clip: float = 5
     policy_delay: int = 2
     gamma: float = 0.9
-    max_buffer_size: int = 500
+    max_buffer_size: int = 2000
     # gae_lambda: float = 1
     # ent_coef: float = 0
     # vf_coef: float = 0.5
@@ -118,3 +118,4 @@ class Args:
     # max_train_perEp: int = 1
     # xa_init_gain: float = 1.
     optimizer_class: Type[th.optim.Optimizer] = th.optim.SGD
+    d_ff: int = 32

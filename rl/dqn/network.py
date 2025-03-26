@@ -20,6 +20,18 @@ from stable_baselines3.common.torch_layers import (
 from stable_baselines3.common.type_aliases import PyTorchObs, Schedule
 from rl.dqn.dqn_para import Args
 
+class FlattenHead(nn.Module):
+    def __init__(self, nf, action_dim, head_dropout):
+        super().__init__()
+        self.flatten = nn.Flatten(start_dim=-2)
+        self.linear = nn.Linear(nf, action_dim)
+        self.dropout = nn.Dropout(head_dropout)
+
+    def forward(self, x):
+        x = self.flatten(x)
+        x = self.linear(x)
+        x = self.dropout(x)
+        return x
 
 class q_net(nn.Module):
     """
@@ -58,7 +70,7 @@ class q_net(nn.Module):
         features_extractor: Union[List[int], nn.Module] = None,
         # features_dim: int,
         activation_fn: Type[nn.Module] = nn.ReLU,
-        n_critics: int = 2,
+        d_ff: int = 2,
         share_features_extractor: bool = True,
         args: Args = None,
     ):
@@ -89,6 +101,8 @@ class q_net(nn.Module):
         #     self.fe_net = None
 
         
+        self.d_ff = 16
+
 
         # Update the feature extractor to LLM model
         self.tokenizer = GPT2Tokenizer.from_pretrained('local_models/gpt2')
@@ -106,7 +120,8 @@ class q_net(nn.Module):
         # for idx in range(n_critics):
         
         q_net_list = create_mlp(self.llm_model.config.n_embd, action_dim, net_arch, activation_fn) # update net_arch for the ANN, can be null list: []
-        self.q_network = nn.Sequential(*q_net_list)
+        # self.q_network = nn.Sequential(*q_net_list)
+        self.q_network = FlattenHead(nf=self.d_ff*256, action_dim = action_dim, head_dropout = 0)
         self.q_network.float()
         # self.add_module(f"qf{idx}", q_net)
         # self.q_networks.append(q_net)
@@ -161,7 +176,8 @@ class q_net(nn.Module):
         inputs_token = self.generate_token(obs, state_list=state_list)
         llm_feature = self.llm_model(**inputs_token)
         last_hidden_states = llm_feature[0]  # The last hidden-state is the first element of the output tuple
-        feature = last_hidden_states[:,-1,:]
+        feature = last_hidden_states[:,:,:self.d_ff]
+        # feature = feature
         # if self.fe_net is not None:
         #     with th.set_grad_enabled(not self.share_features_extractor):
         #         feature = self.fe_net(obs.to(th.float32))

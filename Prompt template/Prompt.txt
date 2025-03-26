@@ -1,4 +1,4 @@
-# Current Conditions:
+<|start_prompt|># Current Conditions:
 
 Outdoor temperature: {t_out} °C;
 Indoor temperature: {t_in} °C;
@@ -21,4 +21,4 @@ Decrease the cooling setpoint by 0.5°C.
 Keep the current setpoints as they are.
 
 # Request:
-Please advise on how I should adjust the cooling setpoints to meet the desired cooling load of 17,000 W.
+Please advise on how I should adjust the cooling setpoints to meet the desired cooling load of 17,000 W.<|<end_prompt>|>

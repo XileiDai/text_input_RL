@@ -15,7 +15,7 @@ RL control ref/*
 runs/*
 wandb/*
 Figures/*
-!Large office - 1AV940.idf
+!Small office-1A-Long.idf
 !Large office - 1AV232.idf
 !Small office-1A-Long.idf
 !USA_FL_Miami.722020_TMY2.epw
