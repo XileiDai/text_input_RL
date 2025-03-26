@@ -145,7 +145,7 @@ class buildinggym_env():
         self.action_batch = torch.zeros(args.batch_size, 1).to('cuda')
         self.return_batch = torch.zeros(args.batch_size, 1).to('cuda')
         # self.simulator.events.on('end_zone_timestep_after_zone_reporting', self.handler)
-        self.baseline = pd.read_csv('Data/Day_mean.csv')
+        # self.baseline = pd.read_csv('Data/Day_mean.csv')
         self.com = 24
         self.best_performance = 0
         # self.baseline['Time'] = pd.to_datetime(self.baseline['Time'], format='%m/%d/%Y %H:%M')
@@ -490,7 +490,7 @@ class buildinggym_env():
         hour = time.hour
         min = time.minute
         idx = int(hour*6+int(min/10))
-        baseline_i = self.baseline['Day_mean'].iloc[idx]
+        # baseline_i = self.baseline['Day_mean'].iloc[idx]
         baseline_i = 20000
         # reward_i = max(round(0.3 - abs(data ** 2 - baseline_i ** 2)/baseline_i ** 2,2),-0.4)*5
         # result_i = round(1 - abs(data - baseline_i)/baseline_i,2)
