@@ -85,7 +85,7 @@ class Args:
     """the batch size (computed in runtime)"""        
 
     device: str = 'cuda'
-    learning_rate: float = 0.00001
+    learning_rate: float = 0.000003
     alpha: float = 0.99
     outlook_steps: int = 6
     step_size: int = 1
@@ -114,7 +114,7 @@ class Args:
     sde_sample_freq: int = -1
     # train_perEp: int = 1
     # pol_coef: float = 1
-    total_epoch: int = max(int(100/gradient_steps),200)
+    total_epoch: int = max(int(100/gradient_steps),100)
     # max_train_perEp: int = 1
     # xa_init_gain: float = 1.
     optimizer_class: Type[th.optim.Optimizer] = th.optim.SGD

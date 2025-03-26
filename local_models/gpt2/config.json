@@ -1,5 +1,4 @@
 {
-  "_name_or_path": "gpt2",
   "activation_function": "gelu_new",
   "architectures": [
     "GPT2Model"
@@ -33,7 +32,7 @@
     }
   },
   "torch_dtype": "float32",
-  "transformers_version": "4.49.0",
+  "transformers_version": "4.50.0",
   "use_cache": true,
   "vocab_size": 50257
 }
