@@ -101,7 +101,7 @@ class q_net(nn.Module):
         #     self.fe_net = None
 
         
-        self.d_ff = 32
+        self.d_ff = 16
 
 
         # Update the feature extractor to LLM model
@@ -121,7 +121,7 @@ class q_net(nn.Module):
         
         q_net_list = create_mlp(self.llm_model.config.n_embd, action_dim, net_arch, activation_fn) # update net_arch for the ANN, can be null list: []
         # self.q_network = nn.Sequential(*q_net_list)
-        self.q_network = FlattenHead(nf=self.d_ff*256, action_dim = action_dim, head_dropout = 0.1)
+        self.q_network = FlattenHead(nf=self.d_ff*256, action_dim = action_dim, head_dropout = 0)
         self.q_network.float()
         # self.add_module(f"qf{idx}", q_net)
         # self.q_networks.append(q_net)
