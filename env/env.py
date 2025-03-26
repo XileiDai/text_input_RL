@@ -146,12 +146,12 @@ class buildinggym_env():
     def normalize_input_i(self, state):
         # nor_min = np.array([22.8, 22, 0, 0, 0])
 
-        nor_mean = np.array([28.7, 26, 0.78, 0.58, 0.89, 0])
-        # nor_mean = np.array([28.7, 26, 0.78, 0.58, 0.89])
+        # nor_mean = np.array([28.7, 26, 0.78, 0.58, 0.89, 0])
+        nor_mean = np.array([28.7, 26, 0.78, 0.58, 0.89])
 
         # nor_mean = np.array([28.7, 26, 0.78, 0.58, 0.89])
-        std = np.array([2.17, 0.5, 0.39, 0.26, 0.26, 1])
-        # std = np.array([2.17, 0.5, 0.39, 0.26, 0.26])
+        # std = np.array([2.17, 0.5, 0.39, 0.26, 0.26, 1])
+        std = np.array([2.17, 0.5, 0.39, 0.26, 0.26])
 
         # std = np.array([2.17, 0.5, 0.39, 0.26, 0.26])
 
@@ -315,15 +315,17 @@ class buildinggym_env():
                     self.t_index = t.hour
                 for _, value in self.ext_obs_var.items():
                     state.append(value)
+            state_list = state.copy()
+
             cooling_energy =  obs['Energy_1'].item() + obs['Energy_2'].item() + obs['Energy_3'].item() + obs['Energy_4'].item() + obs['Energy_5'].item()
-            state = self.normalize_input_i(state)
+            # state = self.normalize_input_i(state)
             if self.ext_obs_bool:
                 signal = state[-1]
             else:
                 signal = 0.5
             state = torch.Tensor(state).cuda() if torch.cuda.is_available() and self.args.cuda else torch.Tensor(state).cpu()
             with torch.no_grad():
-                actions, value, logprob = self.agent(state)
+                actions, value, logprob = self.agent(state, state_list = state_list)
                 # actions = torch.argmax(q_values, dim=0).cpu().item()
             self.com +=  (actions.cpu().item()-1)*0.5
             self.com = max(min(self.com, 27), 23)

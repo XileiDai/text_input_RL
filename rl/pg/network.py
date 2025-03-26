@@ -14,6 +14,8 @@ from gymnasium.spaces import (
     Box,
     Discrete
 )
+from transformers import GPT2Tokenizer, GPT2Model
+
 import numpy as np
 import torch as th
 from gymnasium import spaces
@@ -45,6 +47,18 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     torch.nn.init.constant_(layer.bias, bias_const)
     return layer
 
+class FlattenHead(nn.Module):
+    def __init__(self, nf, action_dim, head_dropout):
+        super().__init__()
+        self.flatten = nn.Flatten(start_dim=-2)
+        # self.linear = nn.Linear(nf, action_dim)
+        # self.dropout = nn.Dropout(head_dropout)
+
+    def forward(self, x):
+        x = self.flatten(x)
+        # x = self.linear(x)
+        # x = self.dropout(x)
+        return x
 
 class Agent(nn.Module):
     def __init__(self, 
@@ -97,33 +111,38 @@ class Agent(nn.Module):
 
         if Fe_arch is None:
                 Fe_arch = [64, 32]
-        self.features_extractor = FEBuild_actor(
-            self.observation_space.shape[0],
-            Fe_arch = Fe_arch,
-            # activation_fn=self.activation_fn,
-            device=self.device,
-        )
-        self.mlp_extractor = MlpBuild_actor(
-            self.features_extractor.latent_dim_pi,
-            net_arch=self.net_arch,
-            activation_fn=self.activation_fn,
-            device=self.device,
-        )
+        # self.features_extractor = FEBuild_actor(
+        #     self.observation_space.shape[0],
+        #     Fe_arch = Fe_arch,
+        #     # activation_fn=self.activation_fn,
+        #     device=self.device,
+        # )
+        # self.mlp_extractor = MlpBuild_actor(
+        #     self.features_extractor.latent_dim_pi,
+        #     net_arch=self.net_arch,
+        #     activation_fn=self.activation_fn,
+        #     device=self.device,
+        # )
+        self.tokenizer = GPT2Tokenizer.from_pretrained('local_models/gpt2')
+        self.llm_model = GPT2Model.from_pretrained('local_models/gpt2')  
+        self.llm_model.to('cuda')        
+        self.d_ff = 32
+        self.flat = FlattenHead(nf=self.d_ff*256, action_dim = 3, head_dropout = 0.1)
 
         if type(self.action_space) == Discrete:
             self.dist_type = 'categorical'
             self.action_network = nn.Sequential(
-                                        nn.Linear(self.mlp_extractor.latent_dim_pi, self.action_space.n),
+                                        nn.Linear(self.d_ff*256, self.action_space.n),
                                         nn.Softmax(dim =-1),
                                         ).to(self.device)            
         elif type(self.action_space) == Box:
             self.dist_type = 'normal'
             self.action_network_mu = nn.Sequential(
-                                        nn.Linear(self.mlp_extractor.latent_dim_pi, 1),
+                                        nn.Linear(self.d_ff*256, 1),
                                         nn.Sigmoid(),
                                         ).to(self.device)       
             self.action_network_logstd = nn.Sequential(
-                                        nn.Linear(self.mlp_extractor.latent_dim_pi, 1),
+                                        nn.Linear(self.d_ff*256, 1),
                                         nn.Sigmoid(),
                                         ).to(self.device)                           
         # self.action_dist = CategoricalDistribution(self.action_space.n)
@@ -134,7 +153,7 @@ class Agent(nn.Module):
         if self.dist_type == 'normal':
             self.init_weight(self.action_network_mu)
             self.init_weight(self.action_network_logstd)
-        self.init_weight(self.mlp_extractor.policy_net)
+        # self.init_weight(self.mlp_extractor.policy_net)
         
         self._build(lr_schedule)
         self._load_pre_train(False)
@@ -143,6 +162,46 @@ class Agent(nn.Module):
         if bool:
             self.load_state_dict(torch.load('Archive results\\0-pg-auto-important\\PG-v1__buildinggym-PG__1__1718099220\\model.pth'))
 
+    def generate_prompt(self, obs, state_list = None):
+        with open('Prompt template/Prompt.txt', 'r') as file:
+            # Read the entire content of the file
+            prompt_templatte = file.read()
+        # self.inter_obs_var = ['t_out', 't_in', 'occ', 'light', 'Equip']
+
+        # Outdoor temperature: {t_out} °C;
+        # Indoor temperature: {t_in} °C;
+        # People density per floor area: {people_var} W/m²;
+        # Lighting power per floor area: {light_var} W/m²;
+        # Electrical equipment power per floor area: {equipment_var} W/m²; 
+        occ = 4.30556417E-02 * state_list[2]
+        light = 15.59* state_list[3]
+        Equip = 8.07293281E+00* state_list[4]
+        prompt_templatte = prompt_templatte.replace('{t_out}', str(round(state_list[0],2)))
+        prompt_templatte = prompt_templatte.replace('{t_in}', str(round(state_list[1],2)))
+        prompt_templatte = prompt_templatte.replace('{people_var}', str(round(occ,2)))
+        prompt_templatte = prompt_templatte.replace('{light_var}', str(round(light,2)))
+        prompt_templatte = prompt_templatte.replace('{equipment_var}', str(round(Equip,2)))
+        return prompt_templatte
+
+
+    def generate_token(self, obs, state_list):
+        input_ids = []
+        attention_mask = []
+        if len(obs.shape)>1:
+            for i in range(obs.shape[0]):
+                prompt = self.generate_prompt(obs[i], state_list = state_list[i,:])
+                inputs_token = self.tokenizer(prompt, return_tensors="pt")
+                inputs_token = {key: value.to("cuda") for key, value in inputs_token.items()}
+                input_ids.append(inputs_token['input_ids'])
+                attention_mask.append(inputs_token['attention_mask'])
+            input_ids = torch.stack(input_ids).squeeze()
+            attention_mask = torch.stack(attention_mask).squeeze()
+            tokens = {'input_ids': input_ids, 'attention_mask': attention_mask}
+        else:
+            prompt = self.generate_prompt(obs, state_list=state_list)
+            tokens = self.tokenizer(prompt, return_tensors="pt")
+            tokens = {key: value.to("cuda") for key, value in tokens.items()}
+        return tokens
 
     def set_training_mode(self, mode = True):
         if mode:
@@ -150,7 +209,7 @@ class Agent(nn.Module):
         else:
             self.eval()
 
-    def forward(self, obs: th.Tensor, deterministic: bool = False) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
+    def forward(self, obs: th.Tensor, deterministic: bool = False, state_list = None) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
         """
         Forward pass in all the networks (actor and critic)
 
@@ -159,17 +218,22 @@ class Agent(nn.Module):
         :return: action, value and log probability of the action
         """
         # Preprocess the observation if needed
-        if self.extract_features_bool:
-            pi_features = self.features_extractor.extract_features(obs)
-        else:
-            pi_features = obs
-        # if self.share_features_extractor:
-        #     latent_pi, latent_vf = self.features_extractor(features)
+        # if self.extract_features_bool:
+        #     pi_features = self.features_extractor.extract_features(obs)
         # else:
-        #     pi_features=vf_features = features
-        latent_pi = self.mlp_extractor(pi_features)
+        #     pi_features = obs
+        # # if self.share_features_extractor:
+        # #     latent_pi, latent_vf = self.features_extractor(features)
+        # # else:
+        # #     pi_features=vf_features = features
+        # latent_pi = self.mlp_extractor(pi_features)
+        inputs_token = self.generate_token(obs, state_list=state_list)
+        llm_feature = self.llm_model(**inputs_token)
+        last_hidden_states = llm_feature[0]  # The last hidden-state is the first element of the output tuple
+        feature = last_hidden_states[:,:,:self.d_ff]
+        feature = self.flat(feature)
         # Evaluate the values for the given observations
-        distribution = self._get_action_dist_from_latent(latent_pi)
+        distribution = self._get_action_dist_from_latent(feature)
         actions = distribution.sample()
         log_prob = distribution.log_prob(actions)
         # actions = actions.reshape((-1, *self.action_space.n)) 
@@ -218,7 +282,7 @@ class Agent(nn.Module):
         """
         return self.get_distribution(observation).get_actions(deterministic=deterministic)
 
-    def evaluate_actions(self, obs: PyTorchObs, actions: th.Tensor) -> Tuple[th.Tensor, th.Tensor, Optional[th.Tensor]]:
+    def evaluate_actions(self, obs: PyTorchObs, actions: th.Tensor, state_list = None) -> Tuple[th.Tensor, th.Tensor, Optional[th.Tensor]]:
         """
         Evaluate actions according to the current policy,
         given the observations.
@@ -229,17 +293,22 @@ class Agent(nn.Module):
             and entropy of the action distribution.
         """
         # Preprocess the observation if needed
-        if self.extract_features_bool:
-            pi_features = self.features_extractor.extract_features(obs)
-        else:
-            pi_features = obs
-        # if self.share_features_extractor:
-        #     pi_features, vf_features = self.features_extractor.extract_features(obs)
+        # if self.extract_features_bool:
+        #     pi_features = self.features_extractor.extract_features(obs)
         # else:
-        #     pi_features = features[0]
-        #     vf_features = features[1]
-        latent_pi = self.mlp_extractor(pi_features)
-        distribution = self._get_action_dist_from_latent(latent_pi)
+        #     pi_features = obs
+        # # if self.share_features_extractor:
+        # #     pi_features, vf_features = self.features_extractor.extract_features(obs)
+        # # else:
+        # #     pi_features = features[0]
+        # #     vf_features = features[1]
+        # latent_pi = self.mlp_extractor(pi_features)
+        inputs_token = self.generate_token(obs, state_list=state_list)
+        llm_feature = self.llm_model(**inputs_token)
+        last_hidden_states = llm_feature[0]  # The last hidden-state is the first element of the output tuple
+        feature = last_hidden_states[:,:,:self.d_ff]
+        feature = self.flat(feature)        
+        distribution = self._get_action_dist_from_latent(feature)
         log_prob = distribution.log_prob(actions)
         entropy = distribution.entropy()
         return log_prob, entropy

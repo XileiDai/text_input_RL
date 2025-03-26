@@ -393,6 +393,8 @@ class buildinggym_env():
                             #     self.v_loss_list.append(v_loss_i)
                         # for name, param in self.agent.q_network.q_network.named_parameters():
                         #     print(f"Parameter: {name}, Shape: {param}")
+                        # for name, param in self.agent.q_network.llm_model.named_parameters():
+                        #     print(f"{name}: requires_grad = {param.requires_grad}")                            
 
                     if i % self.args.train_frequency == 0 and self.buffer.buffer_size>self.args.batch_size and self.train:
                         if type(self.algo).__name__ == 'DQN':

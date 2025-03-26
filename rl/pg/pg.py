@@ -175,7 +175,7 @@ class pg(OnPolicyAlgorithm):
             # Convert discrete action from float to long
             actions = actions.long().flatten()
 
-        log_prob, entropy = self.policy.evaluate_actions(obs.float(), actions)
+        log_prob, entropy = self.policy.evaluate_actions(obs.float(), actions, state_list = obs.detach().cpu().numpy())
         # for name, param in self.policy.named_parameters():
         #     print(name, param.shape)            
         # values, log_prob, entropy = rollout_data.old_log_prob
