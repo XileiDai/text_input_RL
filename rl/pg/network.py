@@ -126,6 +126,9 @@ class Agent(nn.Module):
         self.tokenizer = GPT2Tokenizer.from_pretrained('local_models/gpt2')
         self.llm_model = GPT2Model.from_pretrained('local_models/gpt2')  
         self.llm_model.to('cuda')        
+        for param in self.llm_model.parameters():
+            # determine whether to finetune LLM
+            param.requires_grad = False                 
         self.d_ff = 32
         self.flat = FlattenHead(nf=self.d_ff*256, action_dim = 3, head_dropout = 0.1)
 
@@ -381,7 +384,7 @@ class Agent(nn.Module):
     def init_weight(self, network):
         for m in network.modules():
             if isinstance(m, nn.Linear):
-                nn.init.normal_(m.weight, mean=0, std=0.1)
+                nn.init.normal_(m.weight, mean=0, std=.001)
                 # nn.init.orthogonal_(m.weight, gain=1)
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)    
