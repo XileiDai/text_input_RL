@@ -211,11 +211,12 @@ class DQN(OffPolicyAlgorithm):
             #     self.policy_delay = self.args.gradient_steps
             # Sample replay buffer
             # replay_data = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)  # type: ignore[union-attr]
-            data = self.env.buffer.get_sample(self.args.batch_size, shuffle = True)  # type: ignore[union-attr]
+            # data = self.env.buffer.get_sample(self.args.batch_size, shuffle = True)  # type: ignore[union-attr]
+            data = self.env.buffer.sample(self.args.batch_size)  # type: ignore[union-attr]
             obs = data[0]
             actions = data[1]
-            rewards = data[2]
-            nxt_obs = data[3]
+            rewards = data[4]
+            nxt_obs = data[2]
             dones = 0
 
             with th.no_grad():
@@ -223,7 +224,7 @@ class DQN(OffPolicyAlgorithm):
                 td_target = rewards.flatten() + self.args.gamma * target_max
             old_val = self.policy.q_network(obs, state_list= obs.cpu().numpy()).gather(1, actions.to(dtype = th.long)).squeeze()
             old_val = old_val.to(dtype = th.float64)
-            loss = F.mse_loss(td_target, old_val)
+            loss = F.mse_loss(td_target.float(), old_val.float())
             self.policy.q_network.optimizer.zero_grad()
             loss.backward()
             self.policy.q_network.optimizer.step()

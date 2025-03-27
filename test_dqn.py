@@ -131,8 +131,8 @@ elif isinstance(action_sp, Box):
 args = tyro.cli(Args)
 env = buildinggym_env('Small office-1A-Long.idf',
                     'USA_FL_Miami.722020_TMY2.epw',
-                    observation_space,
-                    action_space,
+                    input_sp,
+                    action_sp,
                     input_sp.shape[0],
                     action_sp,
                     args)

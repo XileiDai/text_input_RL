@@ -41,6 +41,7 @@ from energyplus.ooep import (
 import torch.nn as nn
 import wandb
 from rl.util.replaybuffer import ReplayBuffer
+from rl.util.buffers import ReplayBuffer
 from controllables.energyplus import (
     System,
     #WeatherModel,
@@ -109,10 +110,12 @@ class buildinggym_env():
         #     ProgressProvider(),
         #     #LogProvider(),
         # )
-        self.buffer = ReplayBuffer(
-            info=['obs', 'actions', 'rewards', 'nxt_obs'],
-            args=args
-            )
+        # self.buffer = ReplayBuffer(
+        #     info=['obs', 'actions', 'rewards', 'nxt_obs'],
+        #     args=args
+        #     )
+        self.args = args
+        self.buffer = ReplayBuffer(self.args.max_buffer_size,observation_space, action_space, handle_timeout_termination = False)
         self.idf_file = idf_file
         self.epw_file = epw_file
         self.ext_obs_bool = ext_obs_bool
@@ -379,7 +382,13 @@ class buildinggym_env():
                             action_i = self.actions[i]
                             R_i = self.cal_return(self.rewards[i+1:i+b])
                             # if self.batch_n<self.args.batch_size:
-                            self.buffer.add([ob_i, action_i, r_i, ob_nxt_i], max_buffer_size = self.args.max_buffer_size)  # List['obs', 'actions', 'rewards', 'nxt_obs']
+                            # self.buffer.add([ob_i, action_i, r_i, ob_nxt_i], max_buffer_size = self.args.max_buffer_size)  # List['obs', 'actions', 'rewards', 'nxt_obs']
+                            self.buffer.add(ob_i.detach().cpu().numpy(),
+                                            ob_nxt_i.detach().cpu().numpy(),
+                                            action_i.detach().cpu().numpy(),
+                                            r_i,
+                                            0,
+                                            [{'TimeLimit.truncated': False}])  # List['obs', 'actions', 'rewards', 'nxt_obs']
                                 # self.obs_batch[self.batch_n, :] = ob_i
                                 # self.return_batch[self.batch_n, :] = R_i
                                 # self.action_batch[self.batch_n, :] = action_i
@@ -396,7 +405,7 @@ class buildinggym_env():
                         # for name, param in self.agent.q_network.llm_model.named_parameters():
                         #     print(f"{name}: requires_grad = {param.requires_grad}")                            
 
-                    if i % self.args.train_frequency == 0 and self.buffer.buffer_size>self.args.batch_size and self.train:
+                    if i % self.args.train_frequency == 0 and (self.buffer.full or self.buffer.pos>self.args.batch_size) and self.train:
                         if type(self.algo).__name__ == 'DQN':
                             # a = time.time()
                             self.actor_losses_i, _ = self.algo.train()
